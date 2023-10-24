@@ -1,6 +1,5 @@
-from main import AVERAGE_SPEED
-
 class Truck:
+    AVERAGE_SPEED = 18
     MAX_CAPACITY = 16
     speed = AVERAGE_SPEED
     total_trucks = 3
