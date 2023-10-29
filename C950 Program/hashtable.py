@@ -90,4 +90,25 @@ class HashTable:
             return str(package)
         else:
             return "Package not found"
+        
+    def get_values(self):
+        values = []
+        for linked_list in self.table:
+            current = linked_list.head
+            while current:
+                values.append(current.value)
+                current = current.next
+        return values
+
+    def keys(self):
+        return [key for key, _ in self.items()]
+
+    def items(self):
+        result = []
+        for linked_list in self.table:
+            current = linked_list.head
+            while current:
+                result.append((current.key, current.value))
+                current = current.next
+        return result
 
