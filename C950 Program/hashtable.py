@@ -1,114 +1,140 @@
-class Node:
-    def __init__(self,key,value) -> None:
-        self.value = value
-        self.key = key
-        self.next = None
+# C950 - Webinar-1 - Let’s Go Hashing
+# W-1_ChainingHashTable_zyBooks_Key-Value.py
+# Ref: zyBooks: Figure 7.8.2: Hash table using chaining.
+# Modified for Key:Value
 
-class LinkedList:
-    def __init__(self) -> None:
-        self.head = None
-    
-    def append(self,key,value):
-        if not self.head:
-            self.head = Node(key,value)
-            return
-        current = self.head
-        while current.next:
-            if current.key == key:
-                current.value = value
-                return
-            current = current.next
-        current.next = Node(key,value)
-    
-    def remove(self,key):
-        current = self.head
-        if not current:
-            return
-        if current.key == key:
-            self.head = current.next
-            return
-        while current.next:
-            if current.next.key == key:
-                current.next = current.next.next
-                return
-            current = current.next
+# HashTable class using chaining.
+class ChainingHashTable:
+    # Constructor with optional initial capacity parameter.
+    # Assigns all buckets with an empty list.
+    def __init__(self, initial_capacity=10):
+        # initialize the hash table with empty bucket list entries.
+        self.table = []
+        for i in range(initial_capacity):
+            self.table.append([])
 
-    def find(self,key):
-        current = self.head
-        while current:
-            if current.key == key:
-                return current.value
-            current = current.next
+    # Inserts a new item into the hash table.
+    ''' 
+    #Original
+    def insert(self, item):
+        # get the bucket list where this item will go.
+        bucket = hash(item) % len(self.table)
+        bucket_list = self.table[bucket]
+
+        # insert the item to the end of the bucket list.
+        bucket_list.append(item)
+    '''
+
+    def insert(self, key, item):  # does both insert and update
+        # get the bucket list where this item will go.
+        bucket = hash(key) % len(self.table)
+        bucket_list = self.table[bucket]
+
+        # update key if it is already in the bucket
+        for kv in bucket_list:
+            # print (key_value)
+            if kv[0] == key:
+                kv[1] = item
+                return True
+
+        # if not, insert the item to the end of the bucket list.
+        key_value = [key, item]
+        bucket_list.append(key_value)
+        return True
+
+    # Searches for an item with matching key in the hash table.
+    # Returns the item if found, or None if not found.
+    '''
+        # Original
+        def search(self, key):
+        # get the bucket list where this key would be.
+        bucket = hash(key) % len(self.table)
+        bucket_list = self.table[bucket]
+        print(bucket_list)
+
+        # search for the key in the bucket list
+        if key in bucket_list:
+            # find the item's index and return the item that is in the bucket list.
+            item_index = bucket_list.index(key)
+            return bucket_list[item_index]
+        else:
+            # the key is not found.
+            return None
+    '''
+
+    def search(self, key):
+        # get the bucket list where this key would be.
+        bucket = hash(key) % len(self.table)
+        bucket_list = self.table[bucket]
+        # print(bucket_list)
+
+        # search for the key in the bucket list
+        for kv in bucket_list:
+            # print (key_value)
+            if kv[0] == key:
+                return kv[1]  # value
         return None
 
+    # Removes an item with matching key from the hash table.
+    '''
+        def remove(self, key):
+        # get the bucket list where this item will be removed from.
+        bucket = hash(key) % len(self.table)
+        bucket_list = self.table[bucket]
 
-class HashTable:
-    def __init__(self,size) -> None:
-        self.size = size
-        self.count = 0 # This is the number of items in the table
-        self.table = [LinkedList() for _ in range(self.size)]
-    
-    def _hash(self,key):
-        return hash(key) % self.size
-    
-    def _resize(self):
-        old_table = self.table
-        self.size *= 2  # Double the size
-        self.table = [LinkedList() for _ in range(self.size)]
-        
-        for ll in old_table:
-            current = ll.head  # Access the head of the linked list
-            while current:
-                self.set(current.key, current.value, rehashing=True)
-                current = current.next
+        # remove the item from the bucket list if it is present.
+        if key in bucket_list:
+            bucket_list.remove(key)
+    '''
 
-    def set(self,key,value,rehashing=False):
-        if not rehashing and self.count / self.size > 0.7:
-            self._resize()
-        
-        index = self._hash(key)
-        if not self.table[index].find(key):
-            self.count += 1
-        self.table[index].append(key,value)
+    def remove(self, key):
+        # get the bucket list where this item will be removed from.
+        bucket = hash(key) % len(self.table)
+        bucket_list = self.table[bucket]
 
-    def get(self,key):
-        index = self._hash(key)
-        return self.table[index].find(key)
-    
-    def remove(self,key):
-        index = self._hash(key)
-        if self.table[index].find(key):
-            self.count -= 1
-        self.table[index].remove(key)
+        # remove the item from the bucket list if it is present.
+        for kv in bucket_list:
+            # print (key_value)
+            if kv[0] == key:
+                bucket_list.remove([kv[0], kv[1]])
 
-    def load_factor(self):
-        return self.count / self.size
-    
-    def lookup(self,package_id):
-        package = self.get(package_id)
-        if package:
-            return str(package)
-        else:
-            return "Package not found"
-        
-    def get_values(self):
-        values = []
-        for linked_list in self.table:
-            current = linked_list.head
-            while current:
-                values.append(current.value)
-                current = current.next
-        return values
 
-    def keys(self):
-        return [key for key, _ in self.items()]
+bestMovies = [
+    [1, "CITIZEN KANE - 1941"],
+    [2, "CASABLANCA - 1942"],
+    [3, "THE GODFATHER - 1972"],
+    [4, "GONE WITH THE WIND - 1939"],
+    [5, "LAWRENCE OF ARABIA - 1962"],
+    [6, "THE WIZARD OF OZ - 1939"],
+    [7, "THE GRADUATE - 1967"],
+    [8, "ON THE WATERFRONT- 1954"],
+    [9, "SCHINDLER'S LIST -1993"],
+    [10, "SINGIN' IN THE RAIN - 1952"],
+    [11, "STAR WARS - 1977"]
+]
 
-    def items(self):
-        result = []
-        for linked_list in self.table:
-            current = linked_list.head
-            while current:
-                result.append((current.key, current.value))
-                current = current.next
-        return result
+myHash = ChainingHashTable()
+
+print("\nInsert:")
+myHash.insert(bestMovies[0][0], bestMovies[0][1])  # 2nd bucket; Key=1, item="CITIZEN KANE - 1941"
+print(myHash.table)
+
+myHash.insert(bestMovies[10][0], bestMovies[10][1])  # 2nd bucket as well; Key=11, item="STAR WARS - 1977"
+print(myHash.table)
+
+print("\nSearch:")
+print(myHash.search(1))  # Key=1, item="CITIZEN KANE - 1941"
+print(myHash.search(11))  # Key=11, item="STAR WARS - 1977"; so same bucket and Chainin is working
+
+print("\nUpdate:")
+myHash.insert(1, "Star Trek - 1979")  # 2nd bucket; Key=1, item="Star Trek - 1979"
+print(myHash.table)
+
+print("\nRemove:")
+myHash.remove(1)  # Key=1, item="Star Trek - 1979" to remove
+print(myHash.table)
+
+myHash.remove(11)  # Key=11, item="STAR WARS - 1977" to remove
+print(myHash.table)
+
 

@@ -3,48 +3,29 @@
 
 import csv
 import datetime
-import re
 
 from truck import Truck
 from package import Package
-from hashtable import HashTable
+from hashtable import ChainingHashTable
 
 AVERAGE_SPEED = 18
 
-def preprocess_address(address):
-    # Use regular expressions to extract the numeric part of the address (assuming it's a postal code)
-    postal_code_match = re.search(r'\b\d{5}\b', address)
-    if postal_code_match:
-        # If a postal code is found, remove it from the address
-        address = address.replace(postal_code_match.group(), '').strip()
-    return address
-
-def extract_zip(s):
-    matches = re.findall(r'\((\d{5})\)', s)
-    if matches:
-        return matches[0]
+def getaddressindex(location):
+    index = 0
+    for row in distance_table:
+        if row[0] == location:
+            return index
+        index += 1
+    return -1
+def get_distance(current_location, destination):
+    current_index = getaddressindex(current_location)
+    destination_index = getaddressindex(destination)
+    if current_index > destination_index:
+        distance = distance_table[current_index][destination_index+1]
     else:
-        return None
+        distance = distance_table[destination_index][current_index+1]
+    return float(distance)
 
-def get_distance(current_location, destination, distance_table):
-    # Preprocess the addresses to remove extraneous information
-    current_location = preprocess_address(current_location)
-    destination = preprocess_address(destination)
-
-    # Get the distance from the current location to the destination using the distance_table
-    distance = distance_table.get((current_location, destination))
-    if distance is None:
-        distance = distance_table.get((destination, current_location))
-    
-    if distance is None:
-        print(f"WARNING: Could not find distance for addresses '{current_location}' to '{destination}'")
-        return float('inf')
-    
-    try:
-        return float(distance)
-    except ValueError:
-        print(f"WARNING: Could not convert distance '{distance}' for addresses '{current_location}' to '{destination}' to float. Skipping...")
-        return float('inf')
 
 def greedy_delivery_algorithm(package_table, distance_table):
     # Create trucks and assign them drivers
@@ -88,8 +69,6 @@ def greedy_delivery_algorithm(package_table, distance_table):
             current_location = truck.current_location
 
             # Select the closest package for delivery
-            # (For simplicity, you can use the first package in the list)
-            # Alternatively, implement a function to find the closest package using the distance_table
             package = packages.pop(0)
 
             # Check if the package can be delivered based on special conditions
@@ -97,13 +76,11 @@ def greedy_delivery_algorithm(package_table, distance_table):
                 problematic_packages.append(package)
                 continue
 
-            # Calculate distance and update delivery details here
-            # For now, as an example:
+            # Calculate distance and update delivery details
             distance = get_distance(current_location, package.address, distance_table)
             if distance == float('inf') or AVERAGE_SPEED == 0:
-                # Handle this case, perhaps log an error or provide a default value
                 print(f"Error: Invalid distance ({distance}) or speed ({AVERAGE_SPEED})")
-                return  # or continue or provide a default value
+                return
             else:
                 delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
             package.delivery_time = delivery_time
@@ -124,8 +101,6 @@ def greedy_delivery_algorithm(package_table, distance_table):
             deliver_packages(driver_id, truck)
 
     # Handle problematic packages
-    # Ideally, we should handle problematic packages during the first pass itself.
-    # But in this simulation, we're treating it separately.
     for driver_id in drivers:
         for truck in trucks:
             deliver_packages(driver_id, truck)
@@ -133,8 +108,8 @@ def greedy_delivery_algorithm(package_table, distance_table):
     return trucks
 
 
+package_table = ChainingHashTable()
 def load_package_data():
-    package_table = HashTable(size=50)
     headers = "PackageID,Address,City,State,Zip,DeliveryDeadline,WeightKILO,Special Notes".split(",")
 
     with open('WGUPSPackageFile.csv', mode='r') as csv_file:
@@ -164,11 +139,10 @@ def load_package_data():
                     int(row['WeightKILO']),
                     row['Special Notes']
                 )
-                package_table.set(package.package_id, package)  # assuming HashTable has an insert method
+                package_table.insert(package.package_id, package)  # assuming HashTable has an insert method
 
                 # For debugging purposes, printing the package details
-                print(package)
-                inserted_package = package_table.lookup(package.package_id)  # assuming HashTable has a lookup method
+                inserted_package = package_table.search(package.package_id)  # assuming HashTable has a lookup method
                 print(inserted_package)
         else:
             print("Header not found in the CSV file.")
@@ -183,75 +157,47 @@ def is_float_convertible(value):
     except ValueError:
         return False
 
+distance_table = []
 def load_distance_data():
-    distance_table = HashTable(size=200)
-
     with open('WGUPSDistanceTable.csv', newline='') as csvfile:
         reader = csv.reader(csvfile)
-
-        # Skip the header rows (including multi-line headers)
-        for _ in range(8):
-            next(reader)
-
-        # Read the main header for destinations
-        destinations_header = next(reader)
-        half_len = len(destinations_header) // 2
-
-        # Splitting the destinations' headers into two halves
-        destinations_without_zip = destinations_header[1:half_len + 1]
-        destinations_with_zip_distance = destinations_header[half_len + 1:]
-
         for row in reader:
-            origin = row[0]
-            for idx, distance in enumerate(row[half_len + 1:]):
-                destination = destinations_without_zip[idx]
+            distance_table.append(row)
 
-                if distance.strip() == '':
-                    continue  # If the distance is empty, skip the iteration
+package_table = load_package_data()
+load_distance_data()
+#def main():
 
-                if not is_float_convertible(distance):
-                    raise ValueError(
-                        f"Unexpected data: '{distance}' from {origin} to {destination}. Expected a distance value.")
+print("Get distance: ",get_distance(distance_table[10][0],distance_table[0][0]))
+print("Checking problematic addresses...")
+for current_location, destination in distance_table.keys():
+    get_distance(current_location, destination, distance_table)
+print("Done checking problematic addresses.")
 
-                distance_float = float(distance)
-                key = (origin, destination)
-                distance_table.set(key,distance_float)
+greedy_delivery_algorithm(package_table, distance_table)
+trucks = greedy_delivery_algorithm(package_table, distance_table)
+while True:
+    print("\nOptions:")
+    print("1. Check package status")
+    print("2. Check total mileage")
+    print("3. Exit")
 
-    return distance_table
+    choice = input("Enter your choice: ")
 
-def main():
-    package_table = load_package_data()
-    distance_table = load_distance_data()
-
-    print("Checking problematic addresses...")
-    for current_location, destination in distance_table.keys():
-        get_distance(current_location, destination, distance_table)
-    print("Done checking problematic addresses.")
-
-    greedy_delivery_algorithm(package_table, distance_table)
-    trucks = greedy_delivery_algorithm(package_table, distance_table)
-    while True:
-        print("\nOptions:")
-        print("1. Check package status")
-        print("2. Check total mileage")
-        print("3. Exit")
-
-        choice = input("Enter your choice: ")
-
-        if choice == '1':
-            pkg_id = input("Enter package ID: ")
-            package = package_table.get(pkg_id)
-            if package:
-                print(f"Package {pkg_id}: Status: {package.status} Delivery Time: {package.delivery_time}")
-            else:
-                print("Package not found.")
-        elif choice == '2':
-            total_mileage = sum([truck.mileage for truck in trucks])
-            print(f"Total Mileage: {total_mileage}")
-        elif choice == '3':
-            break
+    if choice == '1':
+        pkg_id = input("Enter package ID: ")
+        package = package_table.get(pkg_id)
+        if package:
+            print(f"Package {pkg_id}: Status: {package.status} Delivery Time: {package.delivery_time}")
         else:
-            print("Invalid choice. Try again.")
+            print("Package not found.")
+    elif choice == '2':
+        total_mileage = sum([truck.mileage for truck in trucks])
+        print(f"Total Mileage: {total_mileage}")
+    elif choice == '3':
+        break
+    else:
+        print("Invalid choice. Try again.")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+# main()
