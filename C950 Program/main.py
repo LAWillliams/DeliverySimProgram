@@ -36,11 +36,11 @@ def greedy_delivery_algorithm(package_table, distance_table):
 
     # Collect all the packages from the package_table into a list
     packages = []
-    for ll in package_table.table:
-        current = ll.head
-        while current:
-            packages.append(current.value)
-            current = current.next
+    #while len(package_table) > 0:
+    for bucket in package_table.table:
+        for PackageKV in bucket:
+            packages.append(PackageKV[1])
+        #package_table.remove(PackageID)
 
     # Sort the packages by their deadline
     packages.sort(key=lambda x: x.deadline)
@@ -77,7 +77,7 @@ def greedy_delivery_algorithm(package_table, distance_table):
                 continue
 
             # Calculate distance and update delivery details
-            distance = get_distance(current_location, package.address, distance_table)
+            distance = get_distance(current_location,destination=package.address)
             if distance == float('inf') or AVERAGE_SPEED == 0:
                 print(f"Error: Invalid distance ({distance}) or speed ({AVERAGE_SPEED})")
                 return
@@ -87,7 +87,7 @@ def greedy_delivery_algorithm(package_table, distance_table):
             package.status = "Delivered"
             current_time = delivery_time
             truck.current_location = package.address
-
+            truck.mileage += distance
             # Check if any checkpoint is reached
             for checkpoint in checkpoints:
                 if current_time >= checkpoint:
@@ -166,38 +166,33 @@ def load_distance_data():
 
 package_table = load_package_data()
 load_distance_data()
-#def main():
+def main():
 
-print("Get distance: ",get_distance(distance_table[10][0],distance_table[0][0]))
-print("Checking problematic addresses...")
-for current_location, destination in distance_table.keys():
-    get_distance(current_location, destination, distance_table)
-print("Done checking problematic addresses.")
+    print("Get distance: ",get_distance(distance_table[10][0],distance_table[0][0]))
 
-greedy_delivery_algorithm(package_table, distance_table)
-trucks = greedy_delivery_algorithm(package_table, distance_table)
-while True:
-    print("\nOptions:")
-    print("1. Check package status")
-    print("2. Check total mileage")
-    print("3. Exit")
 
-    choice = input("Enter your choice: ")
+    #greedy_delivery_algorithm(package_table, distance_table)
+    trucks = greedy_delivery_algorithm(package_table, distance_table)
+    while True:
+        print("Total mileage: ",trucks[0].mileage+trucks[1].mileage+trucks[2].mileage )
+        print("\nOptions:")
+        print("1. Check package status")
+        print("2. Check total mileage")
+        print("3. Exit")
 
-    if choice == '1':
-        pkg_id = input("Enter package ID: ")
-        package = package_table.get(pkg_id)
-        if package:
-            print(f"Package {pkg_id}: Status: {package.status} Delivery Time: {package.delivery_time}")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            pkg_id = input("Enter package ID: ")
+            package = package_table.search(int(pkg_id))
+            if package:
+                print(package)
+            else:
+                print("Package not found.")
+        elif choice == '2':
+            break
         else:
-            print("Package not found.")
-    elif choice == '2':
-        total_mileage = sum([truck.mileage for truck in trucks])
-        print(f"Total Mileage: {total_mileage}")
-    elif choice == '3':
-        break
-    else:
-        print("Invalid choice. Try again.")
+            print("Invalid choice. Try again.")
 
-# if __name__ == "__main__":
-# main()
+if __name__ == "__main__":
+    main()

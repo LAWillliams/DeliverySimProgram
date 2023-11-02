@@ -98,43 +98,10 @@ class ChainingHashTable:
             if kv[0] == key:
                 bucket_list.remove([kv[0], kv[1]])
 
+    def __iter__(self):
+        for index in self.table:
+            for i in index:
+                yield i[0]
 
-bestMovies = [
-    [1, "CITIZEN KANE - 1941"],
-    [2, "CASABLANCA - 1942"],
-    [3, "THE GODFATHER - 1972"],
-    [4, "GONE WITH THE WIND - 1939"],
-    [5, "LAWRENCE OF ARABIA - 1962"],
-    [6, "THE WIZARD OF OZ - 1939"],
-    [7, "THE GRADUATE - 1967"],
-    [8, "ON THE WATERFRONT- 1954"],
-    [9, "SCHINDLER'S LIST -1993"],
-    [10, "SINGIN' IN THE RAIN - 1952"],
-    [11, "STAR WARS - 1977"]
-]
-
-myHash = ChainingHashTable()
-
-print("\nInsert:")
-myHash.insert(bestMovies[0][0], bestMovies[0][1])  # 2nd bucket; Key=1, item="CITIZEN KANE - 1941"
-print(myHash.table)
-
-myHash.insert(bestMovies[10][0], bestMovies[10][1])  # 2nd bucket as well; Key=11, item="STAR WARS - 1977"
-print(myHash.table)
-
-print("\nSearch:")
-print(myHash.search(1))  # Key=1, item="CITIZEN KANE - 1941"
-print(myHash.search(11))  # Key=11, item="STAR WARS - 1977"; so same bucket and Chainin is working
-
-print("\nUpdate:")
-myHash.insert(1, "Star Trek - 1979")  # 2nd bucket; Key=1, item="Star Trek - 1979"
-print(myHash.table)
-
-print("\nRemove:")
-myHash.remove(1)  # Key=1, item="Star Trek - 1979" to remove
-print(myHash.table)
-
-myHash.remove(11)  # Key=11, item="STAR WARS - 1977" to remove
-print(myHash.table)
-
-
+    def __len__(self):
+        return sum(len(index) for index in self.table)

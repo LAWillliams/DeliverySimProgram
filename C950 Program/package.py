@@ -51,6 +51,6 @@ class Package:
             else:
                 print(
                     f"Package {self.package_id}'s address has been corrected to 410 S. State St., Salt Lake City, UT 84111")
-                self.address = "410 S. State St."
+                self.address = "410 S State St"
 
         return True
