@@ -12,9 +12,9 @@ class Package:
         self.status = "At the hub."  # Default status
         self.departure_time = None
         self.delivery_time = None
-
+        self.mileage = 0
     def __str__(self):
-        return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.status},{self.departure_time},{self.delivery_time}'
+        return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{self.status},{self.departure_time},{self.delivery_time}'
 
     def handle_special_instructions(self, current_driver_id, current_time):
         # If the package is delayed
