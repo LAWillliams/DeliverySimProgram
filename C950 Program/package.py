@@ -16,6 +16,11 @@ class Package:
     def __str__(self):
         return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{self.status},{self.departure_time},{self.delivery_time}'
 
+    def time_status(self,time):
+        del_time = ""
+        time_status = ""
+        return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{time_status},{self.departure_time},{del_time}'
+
     def handle_special_instructions(self, current_driver_id, current_time):
         # If the package is delayed
         if "Delayed on flight---will not arrive to depot until 9:05 am" in self.special_notes:

@@ -26,101 +26,127 @@ def get_distance(current_location, destination):
         distance = distance_table[destination_index][current_index+1]
     return float(distance)
 
-    # Function to print the status at each checkpoint
-
-
-import datetime
-
-
-def print_checkpoint_status(checkpoint_num=None):
-    # Define default checkpoints
+# Function to print the status at each checkpoint
+def print_checkpoint_status(packages, checkpoint_num=None):
     checkpoints = [
         datetime.datetime.combine(datetime.date.today(), datetime.time(8, 35)),
         datetime.datetime.combine(datetime.date.today(), datetime.time(9, 35)),
         datetime.datetime.combine(datetime.date.today(), datetime.time(12, 3)),
     ]
 
-    # If checkpoint_num is not provided or is invalid, print an error message
     if checkpoint_num is None or checkpoint_num < 1 or checkpoint_num > len(checkpoints):
         print("Invalid checkpoint number.")
         return
 
-    # Get the desired checkpoint time
     checkpoint_time = checkpoints[checkpoint_num - 1]
 
-    # Collect all the packages from the package_table into a list
-    packages = []
-    for bucket in package_table.table:
-        for PackageKV in bucket:
-            packages.append(PackageKV[1])
-
-    # Print the status of the packages at the specified checkpoint
     print(f"Status of packages at {checkpoint_time.time()}:")
     for package in packages:
-        print(f"Package {package.package_id}: Status: {package.status} Delivery Time: {package.delivery_time}")
+        if package.delivery_time and package.delivery_time <= checkpoint_time:
+            print(f"Package {package.package_id}: Status: Delivered Delivery Time: {package.delivery_time}")
+        else:
+            print(f"Package {package.package_id}: Status: At Hub Delivery Time: None")
 
 
-def greedy_delivery_algorithm(package_table, distance_table):
-    # Create trucks and assign them drivers
+def greedy_delivery_algorithm(package_table):
     num_of_trucks = 3
     num_of_drivers = 2
     trucks = [Truck(i) for i in range(num_of_trucks)]
     drivers = [i for i in range(num_of_drivers)]
 
-    # Collect all the packages from the package_table into a list
     packages = []
-    #while len(package_table) > 0:
     for bucket in package_table.table:
         for PackageKV in bucket:
             packages.append(PackageKV[1])
-        #package_table.remove(PackageID)
+            #print(PackageKV[1])
 
-    # Sort the packages by their deadline
-    packages.sort(key=lambda x: x.deadline)
-
-    # Initialize the current_time as 8:00 am
+    DEPOT_LOCATION = "HUB"
+    packages.sort(key=lambda x: (x.deadline, get_distance(DEPOT_LOCATION, x.address)))
     current_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
 
-    # List to keep track of problematic packages
     problematic_packages = []
+    PACKAGE_LIMIT_PER_TURN = 16
 
-    def deliver_packages(driver_id, truck):
+    def get_closest_package(location):
+        min_distance = float('inf')
+        closest_package = None
+        index = -1
+        for i, package in enumerate(packages):
+            distance = get_distance(location, package.address)
+            if distance < min_distance:
+                min_distance = distance
+                closest_package = package
+                index = i
+        if index != -1:
+            packages.pop(index)
+        return closest_package
+
+    def deliver_packages(driver_id, truck, SkippedInstructionCheck=False):
         nonlocal current_time
-        while packages:
+        delivered = 0
+        while packages and delivered < PACKAGE_LIMIT_PER_TURN:
             current_location = truck.current_location
+            package = get_closest_package(current_location)
 
-            # Select the closest package for delivery
-            package = packages.pop(0)
+            if not package:
+                break
+            if not SkippedInstructionCheck:
+                if not package.handle_special_instructions(driver_id, current_time):
+                    problematic_packages.append(package)
+                    continue
 
-            # Check if the package can be delivered based on special conditions
-            if not package.handle_special_instructions(driver_id, current_time):
-                problematic_packages.append(package)
-                continue
-
-            # Calculate distance and update delivery details
-            distance = get_distance(current_location,destination=package.address)
-            if distance == float('inf') or AVERAGE_SPEED == 0:
-                print(f"Error: Invalid distance ({distance}) or speed ({AVERAGE_SPEED})")
-                return
+            distance = get_distance(current_location, package.address)
+            delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
+            if delivered == PACKAGE_LIMIT_PER_TURN:
+                distance_back_to_hub = get_distance(package.address, DEPOT_LOCATION)
+                current_time += datetime.timedelta(hours=(distance + distance_back_to_hub) / AVERAGE_SPEED)
+                truck.current_location = DEPOT_LOCATION
             else:
-                delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
-            package.delivery_time = delivery_time
-            package.status = "Delivered"
-            current_time = delivery_time
-            truck.current_location = package.address
+                package.delivery_time = delivery_time
+                package.status = "Delivered"
+                current_time = delivery_time
+                truck.current_location = package.address
             truck.mileage += distance
             package.mileage = distance
-            print(current_location,',',package.address,',',package)
-    # Assign each driver a specific truck and start delivering packages
-    for i in range(num_of_drivers):
-        truck = trucks[i]
-        driver_id = drivers[i]
-        deliver_packages(driver_id, truck)
+            delivered += 1
 
-    # Handle problematic packages
-    for driver_id in drivers:
-        for truck in trucks:
-            deliver_packages(driver_id, truck)
+    truck_index = 0
+    while packages:
+        for driver_id in drivers:
+            if truck_index < num_of_trucks:
+                truck = trucks[truck_index]
+                if truck_index == 2:
+                    p9 = package_table.search(9)
+                    p9.address = "410 S State St"
+                    p9.zip = "84111"
+                deliver_packages(driver_id, truck)
+                truck_index += 1
+
+    # Now reprocess problematic packages by appending them back to the packages list
+    packages += problematic_packages
+    #print(packages)
+    problematic_packages.clear()
+
+    truck_index = 0
+    while packages:
+        for driver_id in drivers:
+            if truck_index < num_of_trucks:
+                truck = trucks[truck_index]
+                deliver_packages(driver_id, truck, True)
+                truck_index += 1
+
+    total_mileage = sum([truck.mileage for truck in trucks])
+    print(f"Total mileage for all trucks: {total_mileage:.2f} miles")
+    for i, truck in enumerate(trucks):
+        print(f"Mileage for Truck {i + 1}: {truck.mileage:.2f} miles")
+
+    undelivered_packages = [pkg for pkg in packages if pkg.status != "Delivered"]
+    if not undelivered_packages:
+        print("All packages have been delivered!")
+    else:
+        print(f"{len(undelivered_packages)} packages have not been delivered.")
+        for pkg in undelivered_packages:
+            print(f"Package {pkg.package_id} at address {pkg.address} is {pkg.status}.")
 
     return trucks
 
@@ -157,12 +183,10 @@ def load_package_data():
                     row['Special Notes']
                 )
                 package_table.insert(package.package_id, package)  # assuming HashTable has an insert method
-
-                # For debugging purposes, printing the package details
-                inserted_package = package_table.search(package.package_id)  # assuming HashTable has a lookup method
-                #print(inserted_package)
         else:
             print("Header not found in the CSV file.")
+
+
 
     return package_table
 
@@ -183,15 +207,17 @@ def load_distance_data():
 
 package_table = load_package_data()
 load_distance_data()
+# Convert the hashtable of packages into a list for easier access
+packages = [PackageKV[1] for bucket in package_table.table for PackageKV in bucket]
+
 def main():
 
     #print("Get distance: ",get_distance(distance_table[10][0],distance_table[0][0]))
 
 
     #greedy_delivery_algorithm(package_table, distance_table)
-    trucks = greedy_delivery_algorithm(package_table, distance_table)
+    greedy_delivery_algorithm(package_table)
     while True:
-        print("Total mileage: ",trucks[0].mileage+trucks[1].mileage+trucks[2].mileage )
         print("\nOptions:")
         print("1. Check package status")
         print("2. Check package checkpoints")
@@ -215,11 +241,11 @@ def main():
             checkpoint_choice = input("Choose a checkpoint: ")
 
             if checkpoint_choice == '1':
-                print_checkpoint_status(1)
+                print_checkpoint_status(packages, 1)
             elif checkpoint_choice == '2':
-                print_checkpoint_status(2)
+                print_checkpoint_status(packages,2)
             elif checkpoint_choice == '3':
-                print_checkpoint_status(3)
+                print_checkpoint_status(packages,3)
             else:
                 print("Invalid option")
 
