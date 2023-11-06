@@ -3,7 +3,7 @@
 
 import csv
 import datetime
-
+import datetime as dt
 from truck import Truck
 from package import Package
 from hashtable import ChainingHashTable
@@ -44,6 +44,8 @@ def print_checkpoint_status(packages, checkpoint_num=None):
     for package in packages:
         if package.delivery_time and package.delivery_time <= checkpoint_time:
             print(f"Package {package.package_id}: Status: Delivered Delivery Time: {package.delivery_time}")
+        elif package.status == "En route":  # Checking if the package is en route
+            print(f"Package {package.package_id}: Status: En route Delivery Time: Expected at {package.delivery_time}")
         else:
             print(f"Package {package.package_id}: Status: At Hub Delivery Time: None")
 
@@ -84,6 +86,7 @@ def greedy_delivery_algorithm(package_table):
     def deliver_packages(driver_id, truck, SkippedInstructionCheck=False):
         nonlocal current_time
         delivered = 0
+
         while packages and delivered < PACKAGE_LIMIT_PER_TURN:
             current_location = truck.current_location
             package = get_closest_package(current_location)
@@ -97,6 +100,9 @@ def greedy_delivery_algorithm(package_table):
 
             distance = get_distance(current_location, package.address)
             delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
+            package.departure_time = current_time
+            for package in packages:
+                package.status = "En route"
             if delivered == PACKAGE_LIMIT_PER_TURN:
                 distance_back_to_hub = get_distance(package.address, DEPOT_LOCATION)
                 current_time += datetime.timedelta(hours=(distance + distance_back_to_hub) / AVERAGE_SPEED)
@@ -119,6 +125,8 @@ def greedy_delivery_algorithm(package_table):
                     p9 = package_table.search(9)
                     p9.address = "410 S State St"
                     p9.zip = "84111"
+                for package in truck.current_packages:
+                    package.status = "En route"
                 deliver_packages(driver_id, truck)
                 truck_index += 1
 
@@ -237,6 +245,7 @@ def main():
             print("1. Checkpoint at 8:35 AM")
             print("2. Checkpoint at 9:35 AM")
             print("3. Checkpoint at 12:03 PM")
+            print("4. Input time to check package statuses")
 
             checkpoint_choice = input("Choose a checkpoint: ")
 
@@ -246,6 +255,22 @@ def main():
                 print_checkpoint_status(packages,2)
             elif checkpoint_choice == '3':
                 print_checkpoint_status(packages,3)
+                from datetime import datetime
+            elif checkpoint_choice == '4':
+                time_str = input("Enter the time in HH:MM format: ")
+                try:
+                    time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
+                    for pkg in packages:
+                        if pkg.delivery_time and pkg.delivery_time.time() <= time_to_check:
+                            print(
+                                f"Package {pkg.package_id}: Status: Delivered Delivery Time: {pkg.delivery_time.time()}")
+                        elif pkg.status == "En route":  # Checking if the package is en route
+                            print(
+                                f"Package {pkg.package_id}: Status: En route Delivery Time: Expected at {pkg.delivery_time.time()}")
+                        else:
+                            print(f"Package {pkg.package_id}: Status: At Hub Delivery Time: None")
+                except ValueError:
+                    print("Invalid time format. Please use HH:MM format.")
             else:
                 print("Invalid option")
 
