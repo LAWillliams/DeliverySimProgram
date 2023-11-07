@@ -44,31 +44,42 @@ def print_checkpoint_status(packages, checkpoint_num=None):
     for package in packages:
         if package.delivery_time and package.delivery_time <= checkpoint_time:
             print(f"Package {package.package_id}: Status: Delivered Delivery Time: {package.delivery_time}")
-        elif package.status == "En route":  # Checking if the package is en route
+        # Check if both times are not None before comparing
+        elif package.departure_time and package.delivery_time and package.departure_time < package.delivery_time:
             print(f"Package {package.package_id}: Status: En route Delivery Time: Expected at {package.delivery_time}")
         else:
             print(f"Package {package.package_id}: Status: At Hub Delivery Time: None")
 
 
+# Define the main delivery algorithm that assigns and delivers packages using trucks and drivers.
 def greedy_delivery_algorithm(package_table):
+    # Set up the number of trucks and drivers available for deliveries.
     num_of_trucks = 3
     num_of_drivers = 2
+    # Initialize the trucks with unique IDs.
     trucks = [Truck(i) for i in range(num_of_trucks)]
+    # Assume drivers are numbered and create a list of them.
     drivers = [i for i in range(num_of_drivers)]
 
+    # Extract packages from the hash table and place them into a list for processing.
     packages = []
     for bucket in package_table.table:
         for PackageKV in bucket:
             packages.append(PackageKV[1])
-            #print(PackageKV[1])
 
+    # Define the depot location as a constant.
     DEPOT_LOCATION = "HUB"
+    # Sort packages first by deadline, then by distance from the depot to prioritize delivery order.
     packages.sort(key=lambda x: (x.deadline, get_distance(DEPOT_LOCATION, x.address)))
+    # Set the current time to the start of the delivery day.
     current_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
 
+    # Create a list to hold packages that cannot be delivered on the first attempt.
     problematic_packages = []
+    # Define a limit to how many packages can be delivered per turn.
     PACKAGE_LIMIT_PER_TURN = 16
 
+    # Nested function to find the closest package to the current truck location.
     def get_closest_package(location):
         min_distance = float('inf')
         closest_package = None
@@ -79,34 +90,44 @@ def greedy_delivery_algorithm(package_table):
                 min_distance = distance
                 closest_package = package
                 index = i
+        # Remove the closest package from the list once identified.
         if index != -1:
             packages.pop(index)
         return closest_package
 
+    # Nested function to handle the delivery of packages for one truck and driver.
     def deliver_packages(driver_id, truck, SkippedInstructionCheck=False):
-        nonlocal current_time
-        delivered = 0
+        nonlocal current_time  # Allows modification of the current_time variable from the outer scope.
+        delivered = 0  # Counter for how many packages have been delivered in this turn.
 
+        # Continue delivering packages until there are none left or the turn limit is reached.
         while packages and delivered < PACKAGE_LIMIT_PER_TURN:
             current_location = truck.current_location
+            # Get the closest package to the truck's current location.
             package = get_closest_package(current_location)
 
+            # Break the loop if no package is found (all are delivered).
             if not package:
                 break
+            # If we're not skipping instruction check and there are special instructions that can't be handled, skip the package.
             if not SkippedInstructionCheck:
                 if not package.handle_special_instructions(driver_id, current_time):
                     problematic_packages.append(package)
                     continue
 
+            # Calculate distance and delivery time for the current package.
             distance = get_distance(current_location, package.address)
             delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
-            package.departure_time = current_time
-            for package in packages:
-                package.status = "En route"
+            # Set departure time for the package if the truck is at the depot.
+            if truck.current_location == DEPOT_LOCATION:
+                package.departure_time = current_time
+
+            # If the truck has reached the package limit, it returns to the depot.
             if delivered == PACKAGE_LIMIT_PER_TURN:
                 distance_back_to_hub = get_distance(package.address, DEPOT_LOCATION)
                 current_time += datetime.timedelta(hours=(distance + distance_back_to_hub) / AVERAGE_SPEED)
                 truck.current_location = DEPOT_LOCATION
+            # Otherwise, update the package's delivery time and status, and update the truck's location and mileage.
             else:
                 package.delivery_time = delivery_time
                 package.status = "Delivered"
@@ -116,38 +137,46 @@ def greedy_delivery_algorithm(package_table):
             package.mileage = distance
             delivered += 1
 
+    # Begin the first round of deliveries.
     truck_index = 0
     while packages:
         for driver_id in drivers:
             if truck_index < num_of_trucks:
                 truck = trucks[truck_index]
+                # If we are using the third truck, update the address for package 9 as per special instruction.
                 if truck_index == 2:
                     p9 = package_table.search(9)
                     p9.address = "410 S State St"
                     p9.zip = "84111"
-                for package in truck.current_packages:
-                    package.status = "En route"
+                # Deliver packages using the current truck and driver.
                 deliver_packages(driver_id, truck)
                 truck_index += 1
 
-    # Now reprocess problematic packages by appending them back to the packages list
+    # Re-attempt delivery for packages that had issues on the first attempt.
     packages += problematic_packages
-    #print(packages)
     problematic_packages.clear()
 
+    # Begin the second round of deliveries for any remaining packages,
+    # including those that had special instructions or issues on the first attempt.
     truck_index = 0
     while packages:
         for driver_id in drivers:
             if truck_index < num_of_trucks:
                 truck = trucks[truck_index]
+                # Now deliver packages with SkippedInstructionCheck set to True,
+                # indicating that we are attempting to deliver problematic packages
+                # which may have had their special instructions resolved.
                 deliver_packages(driver_id, truck, True)
                 truck_index += 1
 
+    # After all delivery attempts, calculate and print the total mileage covered by all trucks.
     total_mileage = sum([truck.mileage for truck in trucks])
     print(f"Total mileage for all trucks: {total_mileage:.2f} miles")
+    # Print the mileage for each individual truck.
     for i, truck in enumerate(trucks):
         print(f"Mileage for Truck {i + 1}: {truck.mileage:.2f} miles")
 
+    # Identify and print the status of any packages that have not been successfully delivered.
     undelivered_packages = [pkg for pkg in packages if pkg.status != "Delivered"]
     if not undelivered_packages:
         print("All packages have been delivered!")
@@ -156,7 +185,9 @@ def greedy_delivery_algorithm(package_table):
         for pkg in undelivered_packages:
             print(f"Package {pkg.package_id} at address {pkg.address} is {pkg.status}.")
 
+    # Return the list of trucks, which now contains updated mileage and delivery information.
     return trucks
+
 
 
 package_table = ChainingHashTable()

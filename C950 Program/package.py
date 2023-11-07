@@ -18,8 +18,8 @@ class Package:
 
     def time_status(self,time):
         del_time = ""
-        time_status = ""
-        return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{time_status},{self.departure_time},{del_time}'
+        current_status = ""
+        return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{current_status},{self.departure_time},{del_time}'
 
     def handle_special_instructions(self, current_driver_id, current_time):
         # If the package is delayed
