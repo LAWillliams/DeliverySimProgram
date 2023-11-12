@@ -26,31 +26,6 @@ def get_distance(current_location, destination):
         distance = distance_table[destination_index][current_index+1]
     return float(distance)
 
-# Function to print the status at each checkpoint
-def print_checkpoint_status(packages, checkpoint_num=None):
-    checkpoints = [
-        datetime.datetime.combine(datetime.date.today(), datetime.time(8, 35)),
-        datetime.datetime.combine(datetime.date.today(), datetime.time(9, 35)),
-        datetime.datetime.combine(datetime.date.today(), datetime.time(12, 3)),
-    ]
-
-    if checkpoint_num is None or checkpoint_num < 1 or checkpoint_num > len(checkpoints):
-        print("Invalid checkpoint number.")
-        return
-
-    checkpoint_time = checkpoints[checkpoint_num - 1]
-
-    print(f"Status of packages at {checkpoint_time.time()}:")
-    for package in packages:
-        if package.delivery_time and package.delivery_time <= checkpoint_time:
-            print(f"Package {package.package_id}: Status: Delivered Delivery Time: {package.delivery_time}")
-        # Check if both times are not None before comparing
-        elif package.departure_time and package.delivery_time and package.departure_time < package.delivery_time:
-            print(f"Package {package.package_id}: Status: En route Delivery Time: Expected at {package.delivery_time}")
-        else:
-            print(f"Package {package.package_id}: Status: At Hub Delivery Time: None")
-
-
 # Define the main delivery algorithm that assigns and delivers packages using trucks and drivers.
 def greedy_delivery_algorithm(package_table):
     # Set up the number of trucks and drivers available for deliveries.
@@ -58,6 +33,9 @@ def greedy_delivery_algorithm(package_table):
     num_of_drivers = 2
     # Initialize the trucks with unique IDs.
     trucks = [Truck(i) for i in range(num_of_trucks)]
+    trucks[0].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
+    trucks[1].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(9, 10))
+    trucks[2].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(10, 30))
     # Assume drivers are numbered and create a list of them.
     drivers = [i for i in range(num_of_drivers)]
 
@@ -73,7 +51,6 @@ def greedy_delivery_algorithm(package_table):
     packages.sort(key=lambda x: (x.deadline, get_distance(DEPOT_LOCATION, x.address)))
     # Set the current time to the start of the delivery day.
     current_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
-
     # Create a list to hold packages that cannot be delivered on the first attempt.
     problematic_packages = []
     # Define a limit to how many packages can be delivered per turn.
@@ -118,9 +95,10 @@ def greedy_delivery_algorithm(package_table):
             # Calculate distance and delivery time for the current package.
             distance = get_distance(current_location, package.address)
             delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
+
             # Set departure time for the package if the truck is at the depot.
-            if truck.current_location == DEPOT_LOCATION:
-                package.departure_time = current_time
+            #if truck.current_location == DEPOT_LOCATION:
+                #package.departure_time = current_time
 
             # If the truck has reached the package limit, it returns to the depot.
             if delivered == PACKAGE_LIMIT_PER_TURN:
@@ -130,6 +108,7 @@ def greedy_delivery_algorithm(package_table):
             # Otherwise, update the package's delivery time and status, and update the truck's location and mileage.
             else:
                 package.delivery_time = delivery_time
+                package.departure_time = truck.departure_time
                 package.status = "Delivered"
                 current_time = delivery_time
                 truck.current_location = package.address
@@ -170,11 +149,11 @@ def greedy_delivery_algorithm(package_table):
                 truck_index += 1
 
     # After all delivery attempts, calculate and print the total mileage covered by all trucks.
-    total_mileage = sum([truck.mileage for truck in trucks])
-    print(f"Total mileage for all trucks: {total_mileage:.2f} miles")
+    #total_mileage = sum([truck.mileage for truck in trucks])
+    #print(f"Total mileage for all trucks: {total_mileage:.2f} miles")
     # Print the mileage for each individual truck.
-    for i, truck in enumerate(trucks):
-        print(f"Mileage for Truck {i + 1}: {truck.mileage:.2f} miles")
+    # for i, truck in enumerate(trucks):
+    #     print(f"Mileage for Truck {i + 1}: {truck.mileage:.2f} miles")
 
     # Identify and print the status of any packages that have not been successfully delivered.
     undelivered_packages = [pkg for pkg in packages if pkg.status != "Delivered"]
@@ -258,54 +237,59 @@ def main():
     greedy_delivery_algorithm(package_table)
     while True:
         print("\nOptions:")
-        print("1. Check package status")
-        print("2. Check package checkpoints")
-        print("3. Exit")
+        print("1. Get a single package status with a time")
+        print("2. Get all package status with a time")
+        print("3. Print all package statuses and total mileage")
+        print("4. Exit")
 
         choice = input("Enter your choice: ")
 
         if choice == '1':
             pkg_id = input("Enter package ID: ")
-            package = package_table.search(int(pkg_id))
-            if package:
-                print(package)
-            else:
-                print("Package not found.")
+            time_str = input("Enter the time in HH:MM format: ")
+            try:
+                # Parsing the input time
+                time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
+
+                package = package_table.search(int(pkg_id))
+                if package:
+                    # Checking if the package is delivered by the input time
+                    if time_to_check >= package.delivery_time.time():
+                        print(package.time_status("Delivered", package.delivery_time))
+                    # Checking if the package has not yet departed
+                    elif time_to_check < package.departure_time.time():
+                        print(package.time_status("At the hub"))
+                    # If the package has departed but not yet delivered
+                    else:
+                        print(package.time_status("En route"))
+                else:
+                    print("Package not found.")
+            except ValueError:
+                print("Invalid time format. Please use HH:MM format.")
+
         elif choice == '2':
-            print("\nOptions:")
-            print("1. Checkpoint at 8:35 AM")
-            print("2. Checkpoint at 9:35 AM")
-            print("3. Checkpoint at 12:03 PM")
-            print("4. Input time to check package statuses")
-
-            checkpoint_choice = input("Choose a checkpoint: ")
-
-            if checkpoint_choice == '1':
-                print_checkpoint_status(packages, 1)
-            elif checkpoint_choice == '2':
-                print_checkpoint_status(packages,2)
-            elif checkpoint_choice == '3':
-                print_checkpoint_status(packages,3)
-                from datetime import datetime
-            elif checkpoint_choice == '4':
-                time_str = input("Enter the time in HH:MM format: ")
-                try:
-                    time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
-                    for pkg in packages:
-                        if pkg.delivery_time and pkg.delivery_time.time() <= time_to_check:
-                            print(
-                                f"Package {pkg.package_id}: Status: Delivered Delivery Time: {pkg.delivery_time.time()}")
-                        elif pkg.status == "En route":  # Checking if the package is en route
-                            print(
-                                f"Package {pkg.package_id}: Status: En route Delivery Time: Expected at {pkg.delivery_time.time()}")
-                        else:
-                            print(f"Package {pkg.package_id}: Status: At Hub Delivery Time: None")
-                except ValueError:
-                    print("Invalid time format. Please use HH:MM format.")
-            else:
-                print("Invalid option")
+            time_str = input("Enter the time in HH:MM format: ")
+            try:
+                time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
+                for i in range(1,41):
+                    pkg = package_table.search(i)
+                    if time_to_check >= pkg.delivery_time.time():
+                        print(pkg.time_status("Delivered", pkg.delivery_time))
+                    elif time_to_check < pkg.departure_time.time():  # Checking if the package is en route
+                        print(pkg.time_status("At the hub"))
+                    else:
+                        print(pkg.time_status("En route"))
+            except ValueError:
+                print("Invalid time format. Please use HH:MM format.")
 
         elif choice == '3':
+            total_mileage = 0
+            for i in range(1,41):
+                pkg = package_table.search(i)
+                print(f"Package ID {i}: {pkg.status} ")
+                total_mileage += pkg.mileage
+            print(f"Total mileage is  {total_mileage.__round__()}")
+        elif choice == '4':
                 break
         else:
             print("Invalid choice. Try again.")

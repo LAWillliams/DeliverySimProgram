@@ -16,9 +16,7 @@ class Package:
     def __str__(self):
         return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{self.status},{self.departure_time},{self.delivery_time}'
 
-    def time_status(self,time):
-        del_time = ""
-        current_status = ""
+    def time_status(self,current_status,del_time=""):
         return f'{self.package_id},{self.address},{self.city},{self.state},{self.zip},{self.deadline},{self.weight},{self.mileage},{current_status},{self.departure_time},{del_time}'
 
     def handle_special_instructions(self, current_driver_id, current_time):
