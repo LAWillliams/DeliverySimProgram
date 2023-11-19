@@ -26,146 +26,94 @@ def get_distance(current_location, destination):
         distance = distance_table[destination_index][current_index+1]
     return float(distance)
 
-# Define the main delivery algorithm that assigns and delivers packages using trucks and drivers.
-def greedy_delivery_algorithm(package_table):
-    # Set up the number of trucks and drivers available for deliveries.
-    num_of_trucks = 3
-    num_of_drivers = 2
-    # Initialize the trucks with unique IDs.
-    trucks = [Truck(i) for i in range(num_of_trucks)]
-    trucks[0].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
-    trucks[1].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(9, 10))
-    trucks[2].departure_time = datetime.datetime.combine(datetime.date.today(), datetime.time(10, 30))
-    # Assume drivers are numbered and create a list of them.
-    drivers = [i for i in range(num_of_drivers)]
-
-    # Extract packages from the hash table and place them into a list for processing.
-    packages = []
-    for bucket in package_table.table:
-        for PackageKV in bucket:
-            packages.append(PackageKV[1])
-
-    # Define the depot location as a constant.
-    DEPOT_LOCATION = "HUB"
-    # Sort packages first by deadline, then by distance from the depot to prioritize delivery order.
-    packages.sort(key=lambda x: (x.deadline, get_distance(DEPOT_LOCATION, x.address)))
-    # Set the current time to the start of the delivery day.
-    current_time = datetime.datetime.combine(datetime.date.today(), datetime.time(8, 0))
-    # Create a list to hold packages that cannot be delivered on the first attempt.
-    problematic_packages = []
-    # Define a limit to how many packages can be delivered per turn.
-    PACKAGE_LIMIT_PER_TURN = 16
-
     # Nested function to find the closest package to the current truck location.
-    def get_closest_package(location):
-        min_distance = float('inf')
+def get_closest_package(location):
+    min_distance = float('inf')
+    closest_package = None
+    index = -1
+    for i, package in enumerate(packages):
+        distance = get_distance(location, package.address)
+        if distance < min_distance:
+            min_distance = distance
+            closest_package = package
+            index = i
+    # Remove the closest package from the list once identified.
+    if index != -1:
+        packages.pop(index)
+    return closest_package
+
+# Set up the number of trucks and drivers available for deliveries.
+num_of_trucks = 3
+num_of_drivers = 2
+trucks = [Truck(i) for i in range(num_of_trucks)]
+trucks[0].truck_id = 1
+trucks[1].truck_id = 2
+trucks[2].truck_id = 3
+truck_one = trucks[0]
+truck_two = trucks[1]
+truck_three = trucks[2]
+truck_one.current_packages = [1,2,4,5,7,8,10,11,12,13,14,15,16,17,19,20]
+truck_two.current_packages = [3,6,18,21,22,23,24,25,26,27,28,29,30,32,36,38]
+truck_three.current_packages = [9,31,33,34,35,37,39,40]
+truck_one.departure_time = datetime.timedelta(hours=8,minutes=0)
+truck_two.departure_time = datetime.timedelta(hours=9,minutes=10)
+truck_three.departure_time = datetime.timedelta(hours=10, minutes=20)
+
+# This function defines the algorithmic logic for the greedy algorithm to deliver packages
+def deliver_packages(truck):
+    current_time = truck.departure_time
+    current_location = truck.current_location
+    not_delivered = []
+
+    # Load packages into not_delivered list
+    for package_id in truck.current_packages:
+        package = package_table.search(package_id)
+        not_delivered.append(package)
+
+    # Clear the truck's current packages since they are now in the not_delivered list
+    truck.current_packages.clear()
+
+    # Deliver packages
+    while len(not_delivered) > 0:
         closest_package = None
-        index = -1
-        for i, package in enumerate(packages):
-            distance = get_distance(location, package.address)
+        min_distance = float('inf')
+
+        # Find the closest package
+        for package in not_delivered:
+            distance = get_distance(current_location, package.address)
+            package.mileage = distance
+
             if distance < min_distance:
                 min_distance = distance
                 closest_package = package
-                index = i
-        # Remove the closest package from the list once identified.
-        if index != -1:
-            packages.pop(index)
-        return closest_package
 
-    # Nested function to handle the delivery of packages for one truck and driver.
-    def deliver_packages(driver_id, truck, SkippedInstructionCheck=False):
-        nonlocal current_time  # Allows modification of the current_time variable from the outer scope.
-        delivered = 0  # Counter for how many packages have been delivered in this turn.
+        if closest_package is not None:
 
-        # Continue delivering packages until there are none left or the turn limit is reached.
-        while packages and delivered < PACKAGE_LIMIT_PER_TURN:
-            current_location = truck.current_location
-            # Get the closest package to the truck's current location.
-            package = get_closest_package(current_location)
+            # Simulate delivery
+            current_location = closest_package.address
+            not_delivered.remove(closest_package)
 
-            # Break the loop if no package is found (all are delivered).
-            if not package:
-                break
-            # If we're not skipping instruction check and there are special instructions that can't be handled, skip the package.
-            if not SkippedInstructionCheck:
-                if not package.handle_special_instructions(driver_id, current_time):
-                    problematic_packages.append(package)
-                    continue
-
-            # Calculate distance and delivery time for the current package.
-            distance = get_distance(current_location, package.address)
-            delivery_time = current_time + datetime.timedelta(hours=distance / AVERAGE_SPEED)
-
-            # Set departure time for the package if the truck is at the depot.
-            #if truck.current_location == DEPOT_LOCATION:
-                #package.departure_time = current_time
-
-            # If the truck has reached the package limit, it returns to the depot.
-            if delivered == PACKAGE_LIMIT_PER_TURN:
-                distance_back_to_hub = get_distance(package.address, DEPOT_LOCATION)
-                current_time += datetime.timedelta(hours=(distance + distance_back_to_hub) / AVERAGE_SPEED)
-                truck.current_location = DEPOT_LOCATION
-            # Otherwise, update the package's delivery time and status, and update the truck's location and mileage.
-            else:
-                package.delivery_time = delivery_time
-                package.departure_time = truck.departure_time
-                package.status = "Delivered"
-                current_time = delivery_time
-                truck.current_location = package.address
             truck.mileage += distance
-            package.mileage = distance
-            delivered += 1
 
-    # Begin the first round of deliveries.
-    truck_index = 0
-    while packages:
-        for driver_id in drivers:
-            if truck_index < num_of_trucks:
-                truck = trucks[truck_index]
-                # If we are using the third truck, update the address for package 9 as per special instruction.
-                if truck_index == 2:
-                    p9 = package_table.search(9)
-                    p9.address = "410 S State St"
-                    p9.zip = "84111"
-                # Deliver packages using the current truck and driver.
-                deliver_packages(driver_id, truck)
-                truck_index += 1
+            # Calculate the time to deliver
+            travel_time = datetime.timedelta(hours=min_distance / AVERAGE_SPEED)
+            current_time += travel_time  # Update current_time with travel time only
+            if closest_package.package_id == 9:
+                if current_time < datetime.timedelta(hours=10, minutes=20):
+                    closest_package.address = "Waiting for update"
+                    closest_package.zip = "Waiting for update"
+                else:
+                    closest_package.address = "410 S State St"
+                    closest_package.zip = "84111"
+            closest_package.departure_time = truck.departure_time
+            closest_package.delivery_time = current_time
+            closest_package.status = "Delivered"
+            closest_package.truck_id = truck.truck_id
 
-    # Re-attempt delivery for packages that had issues on the first attempt.
-    packages += problematic_packages
-    problematic_packages.clear()
-
-    # Begin the second round of deliveries for any remaining packages,
-    # including those that had special instructions or issues on the first attempt.
-    truck_index = 0
-    while packages:
-        for driver_id in drivers:
-            if truck_index < num_of_trucks:
-                truck = trucks[truck_index]
-                # Now deliver packages with SkippedInstructionCheck set to True,
-                # indicating that we are attempting to deliver problematic packages
-                # which may have had their special instructions resolved.
-                deliver_packages(driver_id, truck, True)
-                truck_index += 1
-
-    # After all delivery attempts, calculate and print the total mileage covered by all trucks.
-    #total_mileage = sum([truck.mileage for truck in trucks])
-    #print(f"Total mileage for all trucks: {total_mileage:.2f} miles")
-    # Print the mileage for each individual truck.
-    # for i, truck in enumerate(trucks):
-    #     print(f"Mileage for Truck {i + 1}: {truck.mileage:.2f} miles")
-
-    # Identify and print the status of any packages that have not been successfully delivered.
-    undelivered_packages = [pkg for pkg in packages if pkg.status != "Delivered"]
-    if not undelivered_packages:
-        print("All packages have been delivered!")
-    else:
-        print(f"{len(undelivered_packages)} packages have not been delivered.")
-        for pkg in undelivered_packages:
-            print(f"Package {pkg.package_id} at address {pkg.address} is {pkg.status}.")
-
-    # Return the list of trucks, which now contains updated mileage and delivery information.
-    return trucks
+    # Update truck's final location and time
+    truck.current_location = current_location
+    truck.return_time = current_time
+    return truck
 
 
 
@@ -228,13 +176,14 @@ load_distance_data()
 # Convert the hashtable of packages into a list for easier access
 packages = [PackageKV[1] for bucket in package_table.table for PackageKV in bucket]
 
+
+
 def main():
 
-    #print("Get distance: ",get_distance(distance_table[10][0],distance_table[0][0]))
+    deliver_packages(truck_one)
+    deliver_packages(truck_two)
+    deliver_packages(truck_three)
 
-
-    #greedy_delivery_algorithm(package_table, distance_table)
-    greedy_delivery_algorithm(package_table)
     while True:
         print("\nOptions:")
         print("1. Get a single package status with a time")
@@ -246,18 +195,24 @@ def main():
 
         if choice == '1':
             pkg_id = input("Enter package ID: ")
-            time_str = input("Enter the time in HH:MM format: ")
+            h,m = input("Enter the time in HH:MM format: ").split(':')
             try:
                 # Parsing the input time
-                time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
+                time_to_check = datetime.timedelta(hours=int(h),minutes=int(m))
 
                 package = package_table.search(int(pkg_id))
+
+                if time_to_check < datetime.timedelta(hours=10,minutes=20):
+                    p9 = package_table.search(9)
+                    p9.address = "Wrong address listed waiting on update"
+                    p9.zip = "Wrong zip listed waiting on update"
+
                 if package:
                     # Checking if the package is delivered by the input time
-                    if time_to_check >= package.delivery_time.time():
+                    if time_to_check >= package.delivery_time:
                         print(package.time_status("Delivered", package.delivery_time))
                     # Checking if the package has not yet departed
-                    elif time_to_check < package.departure_time.time():
+                    elif time_to_check < package.departure_time:
                         print(package.time_status("At the hub"))
                     # If the package has departed but not yet delivered
                     else:
@@ -268,14 +223,23 @@ def main():
                 print("Invalid time format. Please use HH:MM format.")
 
         elif choice == '2':
-            time_str = input("Enter the time in HH:MM format: ")
+            h,m = input("Enter the time in HH:MM format: ").split(':')
             try:
-                time_to_check = dt.datetime.strptime(time_str, '%H:%M').time()
+                time_to_check = datetime.timedelta(hours=int(h),minutes=int(m))
                 for i in range(1,41):
                     pkg = package_table.search(i)
-                    if time_to_check >= pkg.delivery_time.time():
+
+                    if time_to_check < datetime.timedelta(hours=10, minutes=20):
+                        p9 = package_table.search(9)
+                        p9.address = "Wrong address listed waiting on update"
+                        p9.zip = "Wrong zip listed waiting on update"
+                    if time_to_check >= datetime.timedelta(hours=10, minutes=20):
+                        p9.address = "410 S State St"
+                        p9.zip = "84111"
+
+                    if time_to_check >= pkg.delivery_time:
                         print(pkg.time_status("Delivered", pkg.delivery_time))
-                    elif time_to_check < pkg.departure_time.time():  # Checking if the package is en route
+                    elif time_to_check < pkg.departure_time:  # Checking if the package is en route
                         print(pkg.time_status("At the hub"))
                     else:
                         print(pkg.time_status("En route"))

@@ -13,7 +13,8 @@ class Truck:
         self.status = "idle"
         self.special_note = None
         self.departure_time = None
+        self.truck_id = None
 
     def __str__(self):
-        return ("Capacity: %s, Speed: %s mph, Load: %s, Packages: %d, Mileage: %s miles, Address: %s, Status: %s, Departure Time: %s"
-                % (Truck.MAX_CAPACITY, Truck.speed, len(self.current_packages), len(self.current_packages), self.mileage, self.current_location, self.status, self.departure_time))
+        return ("Capacity: %s, Speed: %s mph, Load: %s, Packages: %d, Mileage: %s miles, Address: %s, Status: %s, Departure Time: %s, Truck ID: %s"
+                % (Truck.MAX_CAPACITY, Truck.speed, len(self.current_packages), len(self.current_packages), self.mileage, self.current_location, self.status, self.departure_time, self.truck_id))
