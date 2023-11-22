@@ -206,6 +206,9 @@ def main():
                     p9 = package_table.search(9)
                     p9.address = "Wrong address listed waiting on update"
                     p9.zip = "Wrong zip listed waiting on update"
+                if time_to_check >= datetime.timedelta(hours=10, minutes=20):
+                    p9.address = "410 S State St"
+                    p9.zip = "84111"
 
                 if package:
                     # Checking if the package is delivered by the input time
